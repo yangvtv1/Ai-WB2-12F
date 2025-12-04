@@ -18,7 +18,6 @@ hosal_uart_dev_t UARTLOG = {
 };
 
 
-
 void main()
 {
     // Initialize EasyFlash first

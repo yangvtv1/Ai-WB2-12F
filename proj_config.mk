@@ -14,7 +14,7 @@ CONFIG_BOARD_FLASH_SIZE := 2
 #
 
 #set CONFIG_ENABLE_ACP to 1 to enable ACP, set to 0 or comment this line to disable
-#CONFIG_ENABLE_ACP:=1
+# CONFIG_ENABLE_ACP:=1
 CONFIG_BL_IOT_FW_AP:=1
 CONFIG_BL_IOT_FW_AMPDU:=0
 CONFIG_BL_IOT_FW_AMSDU:=0
@@ -26,6 +26,7 @@ CONFIG_ENABLE_PSM_RAM:=1
 CONFIG_ENABLE_VFS_ROMFS:=1
 CONFIG_EASYFLASH_ENABLE:=1
 CONFIG_BL602_USE_ROM_DRIVER:=1
+CONFIG_LINK_ROM=1
 CONFIG_SYS_APP_TASK_STACK_SIZE:=4096
 CONFIG_SYS_APP_TASK_PRIORITY:=15
 
@@ -35,11 +36,8 @@ CONFIG_SYS_VFS_UART_ENABLE:=1
 CONFIG_SYS_AOS_CLI_ENABLE:=1
 CONFIG_SYS_AOS_LOOP_ENABLE:=1
 CONFIG_SYS_BLOG_ENABLE:=1
-CONFIG_SYS_DMA_ENABLE:=0
+CONFIG_SYS_DMA_ENABLE:=1
 CONFIG_SYS_USER_VFS_ROMFS_ENABLE:=0
-
-CONFIG_LINK_ROM=1
-CONFIG_WIFI:=1
 
 CONFIG_BT:=1
 CONFIG_BT_CENTRAL:=1
@@ -61,4 +59,24 @@ CONFIG_MBEDTLS_BIGNUM_USE_HW:=1
 CONF_ENABLE_COREDUMP:=1
 
 #blog enable components format :=blog_testc cli vfs helper
-LOG_ENABLED_COMPONENTS:=blog_testc hosal loopset looprt bloop http_client_tcp https_mbedtls tcp axk_common tcp_transport http-parser axk_tls axk_mqtt
+LOG_ENABLED_COMPONENTS:=blog_testc hosal loopset looprt bloop http_client_tcp https_mbedtls tcp axk_common tcp_transport http-parser axk_tls axk_mqtt main
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

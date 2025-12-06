@@ -38,8 +38,6 @@ ota_parame ai_ota_parame_init(char *host, int port, char *resource);
 void ai_https_update_ota(void *param);
 void ai_http_update_ota(void *param);
 
-int GetValPercent(void);
-
 
 #endif
 

@@ -26,15 +26,10 @@
 #include "ota_config.h"
 #include "ai_ota.h"
 
-
-int writeTopos;
-ai_http_response_result rsp_result = {0};
-ota_t OtaUDF;
-
 // #include "axk_ota_export.h"
 
 #define BUF_SIZE    1024
-
+ota_t OtaUDF;
 #if defined(MBEDTLS_RANDOM_CONFIG) 
 extern int ai_random(void *p_rng, unsigned char *output, long unsigned int output_len);
 #endif
@@ -58,7 +53,7 @@ static void ai_mbedtls_debug( void *ctx, int level,
                       const char *str )
 {
     ((void) level);
-    LOGA(OTA,"%s:%04d: %s\n", file, line, str);
+    printf("%s:%04d: %s\n", file, line, str);
     fflush(  (FILE *) ctx  );
 }
 
@@ -83,23 +78,11 @@ void ai_https_update_ota(void *param)
     char *port_str = NULL;
     int ret = -1, len;
     int read_bytes = 0;
-    
+    ai_http_response_result rsp_result = {0};
     int writelen = 0;
     unsigned int start_pos = 0;
     uint32_t idx = 0;
     ai_pack_head pack_head_t = {0};
-
-    
-
-
-
-
-    // snprintf(NamiMQTT.mac_str, sizeof(NamiMQTT.mac_str), "%02X%02X%02X%02X%02X%02X", 
-    // mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    // LOGA(OTA,"[%d][%s] - mac= %02X:%02X:%02X:%02X:%02X:%02X \r\n", __LINE__, __func__, AiMAC[0], AiMAC[1], AiMAC[2], AiMAC[3], AiMAC[4], AiMAC[5]);
-
-
-
 
     ota_parame *ota_parame_t = (ota_parame*)malloc(sizeof(ota_parame));
     if(ota_parame_t == NULL) 
@@ -127,14 +110,14 @@ void ai_https_update_ota(void *param)
     mbedtls_entropy_context entropy;    
     mbedtls_ctr_drbg_init(&ctr_drbg);
     mbedtls_entropy_init(&entropy);
-    LOGA(OTA,"mbedtls_entropy_init\r\n");
+    printf("mbedtls_entropy_init\r\n");
     if((ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
                                     NULL, 0)) != 0)
     {
-        LOGA(OTA,"mbedtls_ctr_drbg_seed returned %d\r\n", ret);
+        printf("mbedtls_ctr_drbg_seed returned %d\r\n", ret);
         goto exit;
     }
-    LOGA(OTA,"mbedtls_ctr_drbg_seed success\r\n");
+    printf("mbedtls_ctr_drbg_seed success\r\n");
 #endif
 
     port_str = https_itoa(ota_parame_t->port);
@@ -144,7 +127,7 @@ void ai_https_update_ota(void *param)
                                           MBEDTLS_SSL_TRANSPORT_STREAM,
                                           MBEDTLS_SSL_PRESET_DEFAULT)) != 0)
     {
-        LOGA(OTA,"mbedtls_ssl_config_defaults returned %d\r\n", ret);
+        printf("mbedtls_ssl_config_defaults returned %d\r\n", ret);
         goto exit;
     }
 
@@ -162,24 +145,24 @@ void ai_https_update_ota(void *param)
 
     if ((ret = mbedtls_ssl_setup(&ssl, &conf)) != 0)
     {
-        LOGA(OTA,"mbedtls_ssl_setup returned -0x%x\n\n", -ret);
+        printf("mbedtls_ssl_setup returned -0x%x\n\n", -ret);
         goto exit;
     }
-    LOGA(OTA,"mbedtls_ssl_setup sucess\r\n");
+    printf("mbedtls_ssl_setup sucess\r\n");
 
     if((ret = mbedtls_net_connect(&server_fd, ota_parame_t->host, port_str,
             MBEDTLS_NET_PROTO_TCP)) != 0)
     {
-        LOGA(OTA,"mbedtls_net_connect returned -%x\r\n", -ret);
+        printf("mbedtls_net_connect returned -%x\r\n", -ret);
         goto exit;
     }
-    LOGA(OTA,"mbedtls_net_connect sucess\r\n");
+    printf("mbedtls_net_connect sucess\r\n");
     // axk_at_ota_export(AT_OTA_STATE_FOUND_SERVER);
     // axk_at_ota_export(AT_OTA_STATE_CONNECTED);
     
     mbedtls_ssl_set_bio(&ssl, &server_fd, mbedtls_net_send, mbedtls_net_recv, NULL);
-   
-    // set host
+  
+            // set host
     if((ret = mbedtls_ssl_set_hostname(&ssl, ota_parame_t->host)) != 0)
     {
         LOGA(OTA,"mbedtls_ssl_set_hostname returned -0x%x\r\n", -ret);
@@ -191,13 +174,13 @@ void ai_https_update_ota(void *param)
     {
         if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE)
         {
-            LOGA(OTA,"mbedtls_ssl_handshake returned -0x%x\r\n", -ret);
+            printf("mbedtls_ssl_handshake returned -0x%x\r\n", -ret);
             goto exit;
         }
     }
-    LOGA(OTA,"mbedtls_ssl_handshake sucess\r\n");
+    printf("mbedtls_ssl_handshake sucess\r\n");
     
-    LOGA(OTA,"SSL ciphersuite %s\r\n", mbedtls_ssl_get_ciphersuite(&ssl));
+    printf("SSL ciphersuite %s\n", mbedtls_ssl_get_ciphersuite(&ssl));
 
     request = malloc(strlen("GET ") + strlen(ota_parame_t->resoure) + strlen(" HTTP/1.1\r\nHost: ")
         + strlen(ota_parame_t->host) + strlen("\r\n\r\n") + 1);
@@ -205,10 +188,10 @@ void ai_https_update_ota(void *param)
 
     ret = mbedtls_ssl_write(&ssl, request, strlen((char *)request));
     if(ret < 0){
-        LOGA(OTA,"mbedtls_ssl_write returned -0x%x\r\n", -ret);
+        printf("mbedtls_ssl_write returned -0x%x\r\n", -ret);
         goto exit;
     }
-    LOGA(OTA,"mbedtls_ssl_write success\r\n");
+    printf("mbedtls_ssl_write success\r\n");
 
     /* 解析https响应*/
     while(3 >= rsp_result.parse_status)
@@ -217,16 +200,11 @@ void ai_https_update_ota(void *param)
 			memset(recv_buf, 0, BUF_SIZE);
 			read_bytes = mbedtls_ssl_read(&ssl, recv_buf, BUF_SIZE);
 			if(read_bytes <= 0){
-				LOGA(OTA,"mbedtls_ssl_read returned -0x%x\r\n", -read_bytes);
+				printf("mbedtls_ssl_read returned -0x%x\r\n", -read_bytes);
 				goto exit;
 			}
             idx = read_bytes;
 			memset(&rsp_result, 0, sizeof(rsp_result));
-            printf("\r\nrecv[%u]{", read_bytes);
-            for(int index = 0; index < read_bytes; index++) {
-                printf("%c", recv_buf[index]);
-            }
-            printf("}\r\n");
 			if(ai_parse_http_response(recv_buf, read_bytes, &rsp_result) == -1){
 				goto exit;
 			}
@@ -237,7 +215,7 @@ void ai_https_update_ota(void *param)
 			rsp_result.header_bak = NULL;
 			read_bytes = mbedtls_ssl_read(&ssl, recv_buf + HEADER_BAK_LEN, (BUF_SIZE - HEADER_BAK_LEN));
 			if(read_bytes <= 0){
-				LOGA(OTA,"mbedtls_ssl_read returned -0x%x\r\n", -read_bytes);
+				printf("mbedtls_ssl_read returned -0x%x\r\n", -read_bytes);
 				goto exit;
 			}
             idx = read_bytes + HEADER_BAK_LEN;
@@ -249,15 +227,15 @@ void ai_https_update_ota(void *param)
 
     if(0 == rsp_result.body_len)
     {
-        LOGA(OTA,"New firmware size = 0\r\n");
+        printf("New firmware size = 0\r\n");
         goto exit;
     }else{
-        LOGA(OTA,"\r\nDownload new firmware begin, total size : %d\r\n", (int)rsp_result.body_len);
+        printf("\r\nDownload new firmware begin, total size : %d\n", (int)rsp_result.body_len);
     }
     
-    LOGA(OTA,"MBEDTLS_SSL_MAX_CONTENT_LEN = %d\r\n", MBEDTLS_SSL_MAX_CONTENT_LEN);
+    printf("MBEDTLS_SSL_MAX_CONTENT_LEN = %d\r\n", MBEDTLS_SSL_MAX_CONTENT_LEN);
     writelen = idx - rsp_result.header_len;
-    LOGA(OTA,"head_len = %d writelen=%d index = %d\r\n", (int)rsp_result.header_len, writelen, (int)idx);
+    printf("head_len = %d writelen=%d index = %d\r\n", (int)rsp_result.header_len, writelen, (int)idx);
 
 
     if(writelen == 0){  //第一包数据只有head信息
@@ -268,12 +246,12 @@ void ai_https_update_ota(void *param)
         }
         if(ret < 0)
         {
-            LOGA(OTA,"mbedtls_ssl_read returned -0x%x\r\n", -ret);
+            printf("mbedtls_ssl_read returned -0x%x\r\n", -ret);
             goto exit;
         }
         if(ret == 0)
         {
-            LOGA(OTA,"connection close\r\n");
+            printf("connection close\r\n");
         }
         len = ret;
     }else{  //第一包数据除了head信息还有body信息，需要将body信息单独保存起来处理
@@ -290,7 +268,7 @@ void ai_https_update_ota(void *param)
     memset(recv_buf, 0, off);
     len -= off;
     if (len < 0) {
-        LOGA(OTA,"invalid len\r\n");
+        printf("invalid len\r\n");
         goto exit;
     }
     memcpy(recv_buf, recv_buf+off, len);
@@ -298,22 +276,22 @@ void ai_https_update_ota(void *param)
 
     //擦除flash,4kb对齐
     if(-1 == ota_parame_t->erase_cb(0, (rsp_result.body_len/4096+1)*4096)){
-    	LOGA(OTA,"Warning Fail OTA (erase_cb)\r\n");
+    	printf("[%d][%s] - Warning Fail OTA (erase_cb)\r\n", __LINE__, __func__);
         goto exit;
     }
     //写flash
     if(-1 == ota_parame_t->write_cb(start_pos, recv_buf, len)){
-    	LOGA(OTA,"Warning Fail OTA (write_cb)\r\n");
+    	printf("[%d][%s] - Warning Fail OTA (write_cb)\r\n", __LINE__, __func__);
         goto exit;
     }
     
-    writeTopos = start_pos + len;
+    int writeTopos = start_pos + len;
     do
     {
         len = sizeof(recv_buf) - 1;
         bzero(recv_buf, sizeof(recv_buf));
 
-        // LOGA(OTA, "%d bytes read %d\r\n", len, strlen((char *)recv_buf));
+        // printf("%d bytes read %d\r\n", len, strlen((char *)recv_buf));
        
         ret = mbedtls_ssl_read(&ssl, (unsigned char *)recv_buf, len);
 
@@ -327,53 +305,53 @@ void ai_https_update_ota(void *param)
 
         if(ret < 0)
         {
-            LOGA(OTA,"mbedtls_ssl_read returned -0x%x", -ret);
+            printf("mbedtls_ssl_read returned -0x%x", -ret);
             break;
         }
 
         if(ret == 0)
         {
-            LOGA(OTA,"connection closed");
+            printf("connection closed");
             break;
         }
 
         len = ret;
         mbedtls_md5_update(&md5_ctx, recv_buf, len);
-       
+        
         if(-1 == ota_parame_t->write_cb(writeTopos, recv_buf, len)){
-        	LOGA(OTA,"Warning Fail OTA (writeTopos)\r\n");
+        	printf("[%d][%s] - Warning Fail OTA (writeTopos)\r\n", __LINE__, __func__);
             goto exit;
         }
-        writeTopos += len; 
+        writeTopos += len;
         OtaUDF.UpdatePercent = (uint32_t)((writeTopos * 100) / rsp_result.body_len); 
     } while (writeTopos < (rsp_result.body_len - AI_PACK_HEAD_LEN));
 
-    LOGA(OTA,"\r\n\r\nend\r\n\r\n");
+    printf("\r\n\r\nend\r\n\r\n");
     
     mbedtls_md5_finish(&md5_ctx, md5);
     if(0 == memcmp(md5, pack_head_t.md5, sizeof(&pack_head_t.md5))){
         //MD5校验成功
-        LOGA(OTA,"MD5 verify success\r\n");
+        printf("MD5 verify success\r\n");
         for(int i=0; i<16; i++)
             printf("%02X", md5[i]);
         printf("\r\n");
         ota_parame_t->set_boot_partition_cb();
     }else{
-        LOGA(OTA,"MD5 verify failed\r\n");
+        printf("MD5 verify failed\r\n");
         goto exit;
     }
     // mbedtls_ssl_close_notify(&ssl);
-    LOGA(OTA, "OTA Success\r\n");
+    printf("OTA Success\r\n");
     // axk_at_ota_export(AT_OTA_STATE_FINISH);
     ota_parame_t->rebooot_cb(true);
 
 exit:
-    ERR(OTA, "OTA Failed\r\n");
+    printf("OTA Failed\r\n");
     mbedtls_ssl_free(&ssl);
     mbedtls_net_free(&server_fd);
     mbedtls_ssl_config_free(&conf);
     mbedtls_md5_free(&md5_ctx);
-    ota_parame_t->rebooot_cb(false);
+    // ota_parame_t->rebooot_cb(false);
     // axk_at_ota_export(AT_OTA_STATE_FAIL);
     vTaskDelete(NULL);
 }
@@ -384,17 +362,17 @@ static int connect_server(int server_socket, char *host, int port)
     struct sockaddr_in server_addr;
     in_addr_t dst_addr;
 
-    LOGA(OTA, "host = %s\r\n", host);
+    printf("host = %s\r\n", host);
 
     server_socket = socket(AF_INET, SOCK_STREAM, 0);
 	if(server_socket < 0){
-		LOGA(OTA, "Create socket failed\r\n");
+		printf("\n\r[%s] Create socket failed", __FUNCTION__);
 		return -1;
 	}
-	LOGA(OTA, "Create socket: %d success!\r\n", server_socket);
+	printf("[%s] Create socket: %d success!\n", __FUNCTION__, server_socket);
 	// server = gethostbyname(host);
 	// if(server == NULL){ 
-	// 	ERR(OTA,"[ERROR] Get host ip failed\n");
+	// 	printf("[ERROR] Get host ip failed\n");
 	// 	return -1;
 	// }
 
@@ -404,16 +382,16 @@ static int connect_server(int server_socket, char *host, int port)
         struct hostent *host_info;
         host_info = gethostbyname(host);
         if (!host_info) {
-            ERR(OTA,"[ERROR] Get host ip failed\n");
+            printf("[ERROR] Get host ip failed\n");
             return -1;
         }
         dst_addr = ((struct in_addr *) host_info->h_addr)->s_addr;
-       LOGA(OTA,"host addr is %08lX\n", *(uint32_t *)&dst_addr);
+        printf("host addr is %08lX\n", *(uint32_t *)&dst_addr);
     }
 
 
     // server_addr.sin_addr.s_addr = inet_addr(host);
-    LOGA(OTA,"gethostbyname ok\r\n");
+    printf("gethostbyname ok\r\n");
 
     memset(&server_addr,0,sizeof(server_addr));
 	server_addr.sin_family = AF_INET;
@@ -422,11 +400,11 @@ static int connect_server(int server_socket, char *host, int port)
 	// memcpy((void *)&server_addr.sin_addr,(void *)server->h_addr,4);
 
 	if (connect(server_socket,(struct sockaddr *)&server_addr, sizeof(server_addr)) < 0){
-		LOGA(OTA,"\n\r[%s] Socket connect failed", __FUNCTION__);
+		printf("\n\r[%s] Socket connect failed", __FUNCTION__);
 		return -1;
 	}
 
-    LOGA(OTA,"connect success\r\n");
+    printf("connect success\r\n");
 
 	return server_socket;
 }
@@ -463,7 +441,7 @@ void ai_http_update_ota(void *param)
     if(fd == -1){
         goto exit;
     }
-    LOGA(OTA,"connect server success\r\n");
+    printf("connect server success\r\n");
 
     request = malloc(strlen("GET /") + strlen(ota_parame_t->resoure) + strlen(" HTTP/1.1\r\nHost: ")
         + strlen(ota_parame_t->host) + strlen("\r\n\r\n") + 1);
@@ -471,7 +449,7 @@ void ai_http_update_ota(void *param)
 
     ret = write(fd, request, strlen((char *)request));
     if(ret < 0){
-        LOGA(OTA,"send http requst failed\r\n");
+        printf("send http requst failed\r\n");
         goto exit;
     }
 
@@ -482,15 +460,15 @@ void ai_http_update_ota(void *param)
 			memset(recv_buf, 0, BUF_SIZE);
 			read_bytes = read(fd, recv_buf, BUF_SIZE);
 			if(read_bytes <= 0){
-				LOGA(OTA,"read socket failed\r\n");
+				printf("read socket failed\r\n");
 				goto exit;
 			}
             // for(int i=0; i<read_bytes; i++){
-            //     LOGA(OTA,"%02X ", recv_buf[i]);
+            //     printf("%02X ", recv_buf[i]);
             // }
-            // LOGA(OTA,"\r\n");
-            LOGA(OTA,"len = %d\r\n", read_bytes);
-            LOGA(OTA,"http head = %s\r\n", recv_buf);
+            // printf("\r\n");
+            printf("len = %d\r\n", read_bytes);
+            printf("http head = %s\r\n", recv_buf);
             idx = read_bytes;
 			memset(&rsp_result, 0, sizeof(rsp_result));
 			if(ai_parse_http_response(recv_buf, read_bytes, &rsp_result) == -1){
@@ -504,7 +482,7 @@ void ai_http_update_ota(void *param)
 			rsp_result.header_bak = NULL;
 			read_bytes = read(fd, recv_buf + HEADER_BAK_LEN, (BUF_SIZE - HEADER_BAK_LEN));
 			if(read_bytes <= 0){
-				LOGA(OTA,"read socket failed\r\n");
+				printf("read socket failed\r\n");
 				goto exit;
 			}
             idx = read_bytes + HEADER_BAK_LEN;
@@ -516,14 +494,14 @@ void ai_http_update_ota(void *param)
 
     if(0 == rsp_result.body_len)
     {
-        LOGA(OTA,"New firmware size = 0\r\n");
+        printf("New firmware size = 0\r\n");
         goto exit;
     }else{
-        LOGA(OTA,"Download new firmware begin, total size : %d\n", (int)rsp_result.body_len);
+        printf("Download new firmware begin, total size : %d\n", (int)rsp_result.body_len);
     }
 
     writelen = idx - rsp_result.header_len;
-    LOGA(OTA,"head_len = %d writelen=%d index = %d\r\n", (int)rsp_result.header_len, writelen, (int)idx);
+    printf("head_len = %d writelen=%d index = %d\r\n", (int)rsp_result.header_len, writelen, (int)idx);
     if(writelen != 0){
         memset(recv_buf, 0, rsp_result.header_len);
         memcpy(recv_buf, recv_buf+rsp_result.header_len, writelen);
@@ -533,7 +511,7 @@ void ai_http_update_ota(void *param)
         memset(recv_buf, 0, BUF_SIZE);
         read_bytes = recv(fd, recv_buf, BUF_SIZE, 0);
         if(read_bytes <= 0){
-            LOGA(OTA,"recv ota data failed\r\n");
+            printf("recv ota data failed\r\n");
             goto exit;
         }
         len = read_bytes;
@@ -546,9 +524,9 @@ void ai_http_update_ota(void *param)
     memcpy(recv_buf, recv_buf+off, len);
     mbedtls_md5_update(&md5_ctx, recv_buf, len);
     // for(int i=0; i<len; i++){
-    //     LOGA(OTA,"%02X ", recv_buf[i]);
+    //     printf("%02X ", recv_buf[i]);
     // }
-    // LOGA(OTA,"\r\n");
+    // printf("\r\n");
 
     //擦除flash,4kb对齐
     if(-1 == ota_parame_t->erase_cb(0, (rsp_result.body_len/4096+1)*4096)){
@@ -566,7 +544,7 @@ void ai_http_update_ota(void *param)
         read_bytes = recv(fd, recv_buf, BUF_SIZE, 0);
         if(read_bytes == 0) break;
         if(read_bytes < 0){
-            LOGA(OTA,"read socket failed\r\n");
+            printf("read socket failed\r\n");
             goto exit;
         }
         len = read_bytes;
@@ -574,23 +552,23 @@ void ai_http_update_ota(void *param)
         ota_parame_t->write_cb(writeTopos, recv_buf, len);
         writeTopos += len;
     } while (writeTopos < (rsp_result.body_len - AI_PACK_HEAD_LEN));
-    LOGA(OTA,"\r\n\r\nend\r\n\r\n");
+    printf("\r\n\r\nend\r\n\r\n");
     mbedtls_md5_finish(&md5_ctx, md5);
     if(0 == memcmp(md5, pack_head_t.md5, sizeof(&pack_head_t.md5))){
         //MD5校验成功
-        LOGA(OTA,"MD5 verify success\r\n");
+        printf("MD5 verify success\r\n");
         for(int i=0; i<16; i++)
-            LOGA(OTA,"%02X", md5[i]);
-        LOGA(OTA,"\r\n");
+            printf("%02X", md5[i]);
+        printf("\r\n");
         ota_parame_t->set_boot_partition_cb();
     }else{
-        LOGA(OTA,"MD5 verify failed\r\n");
+        printf("MD5 verify failed\r\n");
         goto exit;
     }
-    LOGA(OTA,"OTA Success\r\n");
+    printf("OTA Success\r\n");
     ota_parame_t->rebooot_cb(true);
 exit:
-    LOGA(OTA,"OTA Failed\r\n");
+    printf("OTA Failed\r\n");
     if(fd >= 0)
         close(fd);
     // ota_parame_t->rebooot_cb(false);

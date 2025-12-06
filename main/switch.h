@@ -8,7 +8,6 @@
 #include "string.h"
 #include <time.h>  // Make sure this header is included
 #include <hosal_rtc.h>
-#include "LibSupport.h"
 #include "ota.h"
 #include "stdbool.h"
 //#include <storage.h>
@@ -56,13 +55,17 @@ struct nami_tm {
 #define DEBOUNCE_TIME_MS 50*4  // 50ms debounce period
 
 
-#define GPIO_LED_NOTIFY     3
+#define GPIO_LED_NOTIFY     14
 #define GPIO_RELAY_OUT4     5//4 //Relay2
 #define GPIO_KEY_IN0        17//3 //PB1
+#define GPIO_KEY_IN12        12//3 //PB1
 
 
 
 #define CALCUALATE_TIME(x)                              ((xTaskGetTickCount() * portTICK_PERIOD_MS) - x)
+
+
+
 
 // #define GPIO_LED_OUT12 5
 // #define GPIO_LED_OUT12 40    //LED1_STATUS
@@ -76,9 +79,6 @@ extern uint8_t gpio_status_relay3;
 extern uint8_t gpio_status_relay4;
 extern uint8_t gpio_status_relay5;
 extern uint8_t gpio_status_relay6;
-
-
-
 
 // test truct
 // Struct to hold on/off times for a schedule
@@ -96,7 +96,7 @@ typedef struct {
     alarm_test_schedule_t schedule[RELAY_SCHEDULE]; // schedule
 } relay_test_schedule_t;
 // end test struct
-#define PDS_WAKEUP_MS         								50
+
 // test truct
 typedef struct {
     uint8_t gpio_status_relay3;   // State for GPIO3 relay
@@ -133,7 +133,6 @@ typedef struct{
 }switch_t;
 
 extern switch_t NamiSwitch;
-extern TaskHandle_t RelayEventTaskHandle;
 
 extern char ip_str[16];
 
@@ -175,6 +174,7 @@ void key2_irq(void *arg);
 void key3_irq(void *arg);
 void key4_irq(void *arg);
 void gpio_irq_init();
+extern TaskHandle_t relay_event_task_handle;
 
 #endif // SWITCH_H
 

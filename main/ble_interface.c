@@ -49,8 +49,6 @@ ble_gatt_conn_cb_t disconn_cb;
 //4 Switch
 #define BLE_4SW_PREFIX "CongTac4"
 
-// #define BLE_IR_PREFIX "InfraRed"
-
 #define BLE_NAME_MAX_LENGTH 16  // "CongTac-XXX" + null terminator
 char ble_slave_name[BLE_NAME_MAX_LENGTH];  // Global variable for BLE name
 uint8_t ble_start_flag = false;

@@ -55,6 +55,8 @@ extern char gssid_ap[50];
 typedef struct {
     SemaphoreHandle_t scan_sem;
     uint8_t scan_done;
+    void (*ExtMQTTStart)(void);
+    void (*ExtMQTTDestroy)(void);
 } wifi_scan_context_t;
 
 extern wifi_scan_context_t scan_ctx;

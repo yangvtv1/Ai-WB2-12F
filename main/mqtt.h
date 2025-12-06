@@ -7,7 +7,7 @@
 #include <mqtt_client.h>
 #include "blog.h"
 #include <bl_gpio.h>
-#include "nami_ir.h"
+// #include "nami_ir.h"
 // #include "storage.h"
 #include <stdint.h>
 
@@ -35,10 +35,12 @@
 #include "ota_config.h"
 #include "ota_hal.h"
 
-#include "nami_ir_recv.h"
+// #include "nami_ir_recv.h"
+
+#include "main.h"
 
 
-// #define DETTECT_IR_PULSE
+#define DETTECT_IR_PULSE
 
 #define MQTT_BUFFER
 #define CHAIN_LATCH 0
@@ -52,6 +54,10 @@
 #define NAMI_DISCONNECT                 98
 #define NAMI_SAVE                       97
 #define NAMI_OFF_SAVE                   10  
+
+
+
+#define VOLTAGE_DEFAULT					3090
 
 // typedef enum{
 
@@ -79,9 +85,31 @@ typedef enum{
 	UDFSUCCESS,
 	UDFCOMPLETE,
 	MAC_ADD,
-	TEMPHUMID,
-	RESET_BUTTON,
-	PARA,
+	PIR_MOTION,
+	PIR_NORMAL,
+	PRESENCE,
+	NO_DETECT_PRESENCE,
+	LOG_NAMI,
+	LOG_IR,
+    LOG_OTA,
+    LOG_WF,
+	LOG_BLE,
+	LOG_PULSE,
+	GET_VAL_PRE,
+	PRESENCE_TRIGGER_FACTOR_1,
+	PRESENCE_TRIGGER_FACTOR_2,
+	PRESENCE_TRIGGER_FACTOR_3,
+	PRESENCE_TRIGGER_FACTOR_4,
+	PRESENCE_MOTION_FACTOR_1,
+	PRESENCE_MOTION_FACTOR_2,
+	PRESENCE_MOTION_FACTOR_3,
+	PRESENCE_MOTION_FACTOR_4,
+	QUERY_PROGRESS,
+	OPEN_CLIB,
+	AUTO_THRESHOLD,
+	CLOSE_CLIB,
+	PRESENCE_ACK,
+	PRESENCE_FAIL,
 	SEND_LEAR = 200
 }mqtt_rsp_e;
 
@@ -102,13 +130,14 @@ typedef enum{
 typedef enum{
 	ELEARN = 1,
 	ELISTEN
+	
 }mqtt_ir_e;
 
 
-#define TYPEDEVICE 												"ir"
+#define TYPEDEVICE 												"pre"
 #define TYPEDEVICEMQTT										    "\"device_type\""
 
-#define FIRMWAREVERSION 										"1.0.74-release"
+#define FIRMWAREVERSION 										"1.0.21-beta"
 #define FIRMWAREVERSIONMQTT										"\"firmware_version\""
 
 #define FIRMWARECURRVERSIONMQTT									"\"firmware_curr_version\""
@@ -116,6 +145,19 @@ typedef enum{
 #define LEARNFORMAT												"{\"ir\" :\"IR:0,0,1,"
 #define LEARNFORMATEND											"\"}"
 
+#define BLE_TYPE                                                "\"type\":" "\"" TYPEDEVICE "\""
+#define BLE_NAME                                                "\"name\":" "\"" TYPEDEVICE "\""
+
+
+
+#define PROC_SUB_PROC_1         								"\""TYPEDEVICE"\":["
+#define PROC_SUB_PROC_2 										"\""TYPEDEVICE"\" :["
+#define PROC_SUB_PROC_3 										"\""TYPEDEVICE"\": ["
+#define PROC_SUB_PROC_4 										"\""TYPEDEVICE"\" : ["
+
+#define DOMAIN_BROKER_MQTT										"mqtt://mqtt.namismart.vn:1883"
+#define USER_NAME_MQTT										    "namismart"
+#define PASSWORD_MQTT											"Q7bjvdqxCzXb7Cy"
 
 /*
 // #define TEST_FULL_CERTIFICATE \
@@ -204,7 +246,7 @@ void handle_topic(const char *event_topic, const char *event_data);
 void mqtt_start(void *pvParameters);
 extern void NamiUpdateMQTT(void);
 extern uint32_t MQTTIRLearn(uint8_t LearnOrListen);
-extern uint16_t NamiMQTTConvertUintToString(uint16_t *Data, uint32_t Counter);
+// extern uint16_t NamiMQTTConvertUintToString(uint16_t *Data, uint32_t Counter);
 
 
 #define MAC_ADDRESS_LENGTH 6
@@ -223,7 +265,7 @@ typedef struct{
 	uint8_t KeyNumber;
 	uint8_t Status;
 	bool    SendStatusFlag;
-	uint16_t DataIRBuffer[1024];//[1024];
+	uint8_t DataIRBuffer[1024];//[1024];
     uint16_t DataIRBufferIndex;
     uint8_t LearnBuffer[2000];//[400];
 	uint32_t LearnCount;
@@ -255,9 +297,9 @@ typedef struct{
 	uint8_t CntFrame;
 	char Host[50];
 
-	uint8_t StatusBuffer[20];
+	bool StatusConnectFlag;
+	bool ConfigBeginFlag;
 
-	// TaskHandle_t MQTTTaskHandle;
 
 	void (*NamiMQTTIRControlSend)(int);
 	// void (*NamiMQTTSuspendIR)(void);
@@ -268,6 +310,7 @@ typedef struct{
 	// void (*NamiMQTTControlTask)(IR_SEND_STATUS );
 	void (*IR_Init)(uint8_t );
 	uint32_t (*IR_LearnToReceive)(IR_RxMode_Type , uint16_t *, bool );
+	void (*NamiMQTTProcPresenceMQTT2way)(uint8_t *, uint16_t );
 }nami_mqtt_t;
 
 extern nami_mqtt_t NamiMQTT;
@@ -275,6 +318,8 @@ extern nami_mqtt_t NamiMQTT;
 extern uint8_t NeedToLearn;
 extern uint8_t LearnTimeout;
 extern bool gmqtt_connected;
-extern TaskHandle_t MQTTTaskHandle;
+extern TaskHandle_t mqtt_task_handle;
+extern void MQTTStart(void);
+extern void MQTTDestroy(void);
 
 #endif /* MQTT_H_ */

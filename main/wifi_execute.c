@@ -258,6 +258,7 @@ static void wifi_event_cb(input_event_t *event, void *private_data)
 		case CODE_WIFI_ON_DISCONNECT:
 		{
 			ret = aos_now_ms();
+			scan_ctx.ExtMQTTDestroy();
 			g_wifi_sta_is_connected = 0;
 			LOGA(WF, "[APP] [EVT] disconnect %lld\r\n", ret);
 		}
@@ -307,6 +308,7 @@ static void wifi_event_cb(input_event_t *event, void *private_data)
 			// } else {
 			// 	LOGA(WF, "Network interface not found\r\n");
 			// }
+			scan_ctx.ExtMQTTStart();
 		}
 		break;
 		case CODE_WIFI_ON_AP_STA_GOT_IP:
@@ -397,6 +399,9 @@ void wifi_scanList(void){
 
 void wifi_execute(void *pvParameters)
 {
+	memset(&scan_ctx, 0x00, sizeof(scan_ctx));
+	scan_ctx.ExtMQTTStart     = &MQTTStart;
+	scan_ctx.ExtMQTTDestroy   = &MQTTDestroy;
     aos_register_event_filter(EV_WIFI, wifi_event_cb, NULL);
     hal_wifi_start_firmware_task();
     aos_post_event(EV_WIFI, CODE_WIFI_ON_INIT_DONE, 0);

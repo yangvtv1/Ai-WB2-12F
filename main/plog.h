@@ -27,6 +27,7 @@
 #include <time.h>  // Make sure this header is included
 #include "stdbool.h"
 
+
 #define BIT(x)                       ((uint32_t)((uint32_t)0x01U<<(x)))
 #define str(x) #x
 #define xstr(x) str(x)
@@ -416,7 +417,7 @@ typedef struct{
 	void (*Init)(void);
 	void (*plog_parser)(char* , uint8_t );
 //	void (*Start)(type_debug_t);
-//	void (*Stop)(type_debug_t);
+	void (*Stop)(type_debug_t);
 }plog_t;
 
 extern plog_t PLOG;
@@ -425,7 +426,7 @@ extern plog_t PLOG;
 typedef void (*FncPassing)(type_debug_t ,char* );
 typedef void (*FncATPassing)(char*);
 extern void PLOG_Init(void);
-extern void PLOG_Stop(type_debug_t _type);
+void PLOG_Stop(type_debug_t _type);
 extern void PLOG_Start(type_debug_t _type);
 void PLOG_Run(void);
 void PLG_PrintHexBuffer( uint8_t *buffer, uint16_t size );

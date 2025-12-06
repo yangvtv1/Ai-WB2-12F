@@ -211,4 +211,30 @@
   + reduce buffer of send IR
   
 2025-06-03 16:57:38 250603_17_main
-  + add username, password mqtt  
+  + add username, password mqtt
+  
+2025-06-04 08:32:48 250604_01_main
+  + reopen about macro of project in file make.mk and proj_config.mk
+  
+2025-06-04 10:25:03 250604_02_main
+  + add lib switch and ble_interface and test update firmware, send ir
+  
+2025-06-04 11:19:54 250604_04_main
+  + Modify only input button BLE, init in main and create task
+  
+2025-06-05 15:02:59 250605_04_main
+  + Intergate success BLE on project, but not yet about exception
+  
+2025-06-06 11:41:43 250606_01_main
+  + Completed task press 2S connect BLE
+  
+2025-06-06 16:36:00 250606_06_main
+  + Completed save flash ssid and pass wifi on easyflash
+  
+2025-06-06 17:02:04 250606_07_main
+  + save flash when set ssid and pass from BLE
+  + if press 5 times will be re-configure BLE for wifi
+
+2025-06-06 17:06:04 250606_07_main
+  + set counter = 0 when press no 5 times
+  

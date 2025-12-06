@@ -2,7 +2,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include "ota_parse.h"
-#include "plog.h"
 // #include "freertos/FreeRTOS.h"
 
 
@@ -18,7 +17,6 @@ int ai_parse_http_response(uint8_t *response, int response_len, ai_http_response
 {
     uint32_t i, p, q, m;
 	uint32_t header_end = 0;
-    LOGA(OTA, "response ={%s}\r\n", response);
     if(0 == result->parse_status)
     {
         uint8_t status[4] = {0};
@@ -45,7 +43,7 @@ int ai_parse_http_response(uint8_t *response, int response_len, ai_http_response
 		if(result->status_code == 200)
 			result->parse_status = 1;
         else{
-            LOGA(OTA, "\r\nThe http response status code is %d\r\n", (int)result->status_code);
+            printf("\r\nThe http response status code is %d\r\n", (int)result->status_code);
             return -1;
         }
     }
@@ -101,7 +99,7 @@ int ai_parse_http_response(uint8_t *response, int response_len, ai_http_response
 					result->body = response + header_end;
 				}
 				else {//there are no content length in header	
-					LOGA(OTA, "\n\r[%s] No Content-Length in header", __FUNCTION__);
+					printf("\n\r[%s] No Content-Length in header", __FUNCTION__);
 					return -1;
 				}
 				break;
@@ -208,17 +206,17 @@ int parse_ai_pack_head(uint8_t *resource, int resource_len, ai_pack_head *pack_h
 {
     // for(int i=0; i<100; i++)
     //     printf("%02X ", resource[i]);
-    // LOGA(OTA, "\r\n");
+    // printf("\r\n");
 
     uint32_t off = 0;
     memcpy(pack_head_t->version, resource+off, VERSION_LEN);
     off += VERSION_LEN;
-    LOGA(OTA, "version = %s\r\n", pack_head_t->version);
+    printf("version = %s\r\n", pack_head_t->version);
 
     char chip_type[5] = {0};
     memcpy(chip_type, resource+off, CHIP_TYPE_LEN);
     off += CHIP_TYPE_LEN;
-    LOGA(OTA, "chip_type = %s\r\n", chip_type);
+    printf("chip_type = %s\r\n", chip_type);
 	if(strcmp(chip_type, "0001")){
 		pack_head_t->chip_type = ESP;
 	}else if(strcmp(chip_type, "0002")){
@@ -237,14 +235,14 @@ int parse_ai_pack_head(uint8_t *resource, int resource_len, ai_pack_head *pack_h
 	memcpy(md5, resource+off, MD5_LEN);
 	off += MD5_LEN;
 	string2hex(md5, &pack_head_t->md5);
-    LOGA(OTA, "http head md5:");
+    printf("http head md5:");
 	for(int i=0; i<16; i++)
         printf("%02X", pack_head_t->md5[i]);
     printf("\r\n");
 
 	memcpy(pack_head_t->url, resource+off, URL_LEN);
 	off += URL_LEN;
-	// LOGA(OTA, "url = %s\r\n", pack_head_t->url);
+	// printf("url = %s\r\n", pack_head_t->url);
 
 	return off;
 }

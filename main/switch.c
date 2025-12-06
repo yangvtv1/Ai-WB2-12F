@@ -3,6 +3,7 @@
 
 
 TaskHandle_t setting_mode_task_handle = NULL;
+TaskHandle_t relay_event_task_handle;
 bool setting_mode_enable = false;
 bool setting_mode_flag = true; // Flag to track if setting mode is enabled
 
@@ -15,9 +16,7 @@ char ip_str[16] = {0};
 
 static hosal_gpio_dev_t isr_key1,isr_key2,isr_key3,isr_key4;
 
-// static relay_test_schedule_t gschedule_relays[RELAY_COUNT]; // 4 relays, each with RELAY_SCHEDULE schedules
 
-// Define gpio_event_t if needed
 typedef struct {
     uint8_t gpioPin;
     bool interrupt_value;  // You can add more fields as needed
@@ -27,18 +26,13 @@ typedef struct {
  static gpio_event_t gevent_gpio;
 xQueueHandle gpio_event_queue;  // Handle for the GPIO event queue
 
-// static uint32_t glast_wifi_connected_time = 0; // To track when WiFi was connected
-// static bool gwifi_started = false;              // Flag to track whether WiFi has been started
-// struct timer_adpt *timer1;
-
-
 
 switch_t NamiSwitch;
-TaskHandle_t RelayEventTaskHandle;
 
 
 TickType_t LocalCurrentTime = NULL;
 TickType_t LocalLEDTime = NULL;
+uint32_t TimerCounter;
 bool StartCountFlag = false;
 uint8_t DesiredGpioState = 0;
 uint8_t PreviousGpioState = 0;
@@ -48,18 +42,8 @@ bool PermisSpamCmdRstFlag = false;
 uint32_t LedExitCalibCnt;
 bool LedExitCalibFlag;
 
-TickType_t TimeCur, TimeOld; 
-
 static void NamiSwitchProc(xTimerHandle pxTimer)
 {
-    // TimeCur = (xTaskGetTickCount() * portTICK_PERIOD_MS);
-    // if(TimeCur != TimeOld && TimeCur != 0){
-    //     LOGA(IR, "Time is = %u\r\n", TimeCur - TimeOld);
-    //     TimeOld = TimeCur;
-    // }else if(!TimeOld){
-    //     TimeOld = TimeCur;
-    // }
-
     if(NamiSwitch.TimerStartFlag){
         NamiSwitch.TimerStartFlag = false;
         LocalCurrentTime = xTaskGetTickCount() * portTICK_PERIOD_MS;
@@ -105,12 +89,12 @@ static void NamiSwitchProc(xTimerHandle pxTimer)
                 if(CALCUALATE_TIME(LocalLEDTime) >= 0 && CALCUALATE_TIME(LocalLEDTime) < 200 && LedExitCalibFlag){
                     LedExitCalibFlag = false;
                     LocalLEDTime = xTaskGetTickCount() * portTICK_PERIOD_MS;
-                    NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_ON);
+                    NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_ON);
                     LedExitCalibCnt++;
                 }else if(CALCUALATE_TIME(LocalLEDTime) >= 0 && CALCUALATE_TIME(LocalLEDTime) < 100 && LedExitCalibFlag == false){
                     LedExitCalibFlag = true;
                     LocalLEDTime = xTaskGetTickCount() * portTICK_PERIOD_MS;
-                    NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_OFF);                
+                    NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_OFF);                
                 }
                 if(LedExitCalibCnt > 3){
                     LedExitCalibCnt = 0;
@@ -122,11 +106,11 @@ static void NamiSwitchProc(xTimerHandle pxTimer)
                 if(ChangeLEDFlag){
                     ChangeLEDFlag = false;
                     LocalLEDTime = xTaskGetTickCount() * portTICK_PERIOD_MS;
-                    NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_ON);
+                    NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_ON);
                 }else {
                     ChangeLEDFlag = true;
                     LocalLEDTime = xTaskGetTickCount() * portTICK_PERIOD_MS;
-                    NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_OFF);
+                    NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_OFF);
                 }  
             }
         }
@@ -138,11 +122,11 @@ static void NamiSwitchProc(xTimerHandle pxTimer)
             if(ChangeLEDFlag){
                 ChangeLEDFlag = false;
                 LocalLEDTime = xTaskGetTickCount() * portTICK_PERIOD_MS;
-                NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_ON);
+                NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_ON);
             }else {
                 ChangeLEDFlag = true;
                 LocalLEDTime = xTaskGetTickCount() * portTICK_PERIOD_MS;
-                NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_OFF);
+                NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_OFF);
             }  
         }       
     }
@@ -150,27 +134,31 @@ static void NamiSwitchProc(xTimerHandle pxTimer)
 
 
 void initialize_switch() {
-    NAMI_GPIO_ENABLE_OUTPUT(GPIO_LED_NOTIFY ,0, 0);
-    NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, 1);
+    NAMI_PRE_GPIO_ENABLE_OUTPUT(GPIO_LED_NOTIFY ,0, 0);
+    NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, 1);
     //enable input and output
-    NAMI_GPIO_ENABLE_INPUT(GPIO_KEY_IN0, 1, 0);
+    NAMI_PRE_GPIO_ENABLE_INPUT(GPIO_KEY_IN0, 1, 0);
+    
+    // initialize interrupt event queue
+    NAMI_PRE_GPIO_IRQ_MASK(&isr_key1, 1); // Mask the interrupt
 
     gpio_irq_init(); 
-    NAMI_GPIO_IRQ_MASK(&isr_key1, 0); // Unmask the interrupt
+    NAMI_PRE_GPIO_IRQ_MASK(&isr_key1, 0); // Unmask the interrupt
 
+    // In your main or init function
     gpio_event_queue = xQueueCreate(25, sizeof(gpio_event_t));
 
     NamiSwitch.TimerSwitchHandler = xTimerCreate("NamiSwitchProc", pdMS_TO_TICKS(PDS_WAKEUP_MS), pdTRUE, NULL, NamiSwitchProc);
     xTimerStart(NamiSwitch.TimerSwitchHandler, 0);
 }
 void LedNotifyStartPro(void){
-    NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_ON);
+    NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_ON);
     vTaskDelay(pdMS_TO_TICKS(100));
-    NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_OFF);
+    NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_OFF);
     vTaskDelay(pdMS_TO_TICKS(100));
-    NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_ON);
+    NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_ON);
     vTaskDelay(pdMS_TO_TICKS(100));
-    NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_OFF);
+    NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_OFF);
     vTaskDelay(pdMS_TO_TICKS(100));
 }
 void gpio_irq_init()
@@ -178,8 +166,8 @@ void gpio_irq_init()
     // // GPIO_KEY_IN0
     isr_key1.port = GPIO_KEY_IN0;
     isr_key1.config = INPUT_PULL_UP;
-    NAMI_GPIO_INIT(&isr_key1);
-    NAMI_GPIO_IRQ_SET(&isr_key1, HOSAL_IRQ_TRIG_NEG_PULSE, key1_irq_neg, NULL);
+    NAMI_PRE_GPIO_INIT(&isr_key1);
+    NAMI_PRE_GPIO_IRQ_SET(&isr_key1, HOSAL_IRQ_TRIG_NEG_PULSE, key1_irq_neg, NULL);
 }
 
 
@@ -201,13 +189,7 @@ void ble_connect_wifi (char *received_data){
 
         cJSON *ssid_item     = cJSON_GetObjectItem(json, "ssid");
         cJSON *password_item = cJSON_GetObjectItem(json, "password");
-        cJSON *HostBle       = cJSON_GetObjectItem(json, "host");
-
-        // if (HostBle == NULL || HostBle->valuestring == NULL) {
-        //     LOGA(WF, "Host not found or invalid\r\n");
-        //     cJSON_Delete(json);
-        //     return;
-        // }
+        // cJSON *HostBle       = cJSON_GetObjectItem(json, "host");
 
         if (ssid_item == NULL || password_item == NULL) {
             LOGA(WF, "ssid or password not found\r\n");
@@ -217,13 +199,6 @@ void ble_connect_wifi (char *received_data){
         wifi_disconnect();
         char *ssid = ssid_item->valuestring;
         char *password = password_item->valuestring;
-
-        // size_t host_len = strlen(HostBle->valuestring);
-        // if (host_len >= sizeof(NamiMQTT.Host)) {
-        //     host_len = sizeof(NamiMQTT.Host) - 1; // Giữ chỗ cho ký tự null
-        // }
-        // memcpy(NamiMQTT.Host, HostBle->valuestring, host_len);
-        // NamiMQTT.Host[host_len] = '\0'; // Đảm bảo kết thúc chuỗi
 
         LOGA(WF, "Received Wi-Fi credentials via BLE: SSID: %s, Password: %s, Host: %s\r\n", 
             ssid, password, NamiMQTT.Host);
@@ -258,7 +233,7 @@ void NamiFlash(void){
 
 void setting_mode_task(void *pvParameters) {
     LOGA(IR, "Entering setting mode: Transmitting Bluetooth for connection...\r\n");
-    // vTaskSuspend(LedTaskHandle); // Suspend LED WiFi task
+    // vTaskSuspend(led_wifi_task_handle); // Suspend LED WiFi task
     setting_mode_enable = true;
     NamiSwitch.ModeCalibFlag = true;
 
@@ -279,34 +254,28 @@ void setting_mode_task(void *pvParameters) {
 
         if(NamiSwitch.BreakOutCalibrateFlag){
             LOGA(IR, "Exit calib wifi in while \r\n");
-            apps_ble_stop();
             NamiSwitch.ModeCalibFlag = false;
+            apps_ble_stop();
             break;
         }
 
-        NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_ON);
+        //blink led
+        //blink led
+        NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_ON);
         vTaskDelay(pdMS_TO_TICKS(500));
-        NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_OFF);
+        NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, LED_OFF);
         vTaskDelay(pdMS_TO_TICKS(500));
 
-        LOGA(WF, "Waiting countdown: %ds\r\n", (attempt*delay_time)/1000);
+        LOGA(WF, "Waiting countdown: %ds, ble_connect_status=%s, setting_mode_enable=%s\r\n", (attempt*delay_time)/1000
+                                                                                            , (ble_connect_status)?"true":"false"
+                                                                                            , setting_mode_enable?"true":"false");
 
         if((ble_connect_status == true && setting_mode_enable == false) || attempt == 0){
-            //****if connected, off ble, create task for led wifi****
-            //reconnecting to previous wifi when attempt fail
             if(attempt == 0){
                 LOGA(WF, "Failed to connect to wifi and bluetooth\n");
-                // wifi_sta_connect("na", NULL);
-                //create task for led wifi
             }
             else{
-                //send feedback to master device
-                // cJSON *json = cJSON_CreateObject();
-                // cJSON_AddStringToObject(json, "result", (g_wifi_sta_is_connected) ? "ok" : "error");
-
-
                 // {"result":"ok","message":"ok","lan_ip":"192.168.250.5","mac_id":"7C:B9:4C:1D:9B:B3","device_id":"9BB3","device_code":"","name":"Infrared","type":"device_ir"}
-
 
                 ble_notification[BleCount++] = '{';
                 memcpy(&ble_notification[BleCount], "\"result\"", strlen("\"result\""));
@@ -371,27 +340,16 @@ void setting_mode_task(void *pvParameters) {
                 ble_notification[BleCount++] = NamiSwitch.SwMacStr[10];
                 ble_notification[BleCount++] = NamiSwitch.SwMacStr[11];
                 ble_notification[BleCount++] = ':';
-                //memcpy(&ble_notification[BleCount], mac_str, strlen(mac_str));
-                // BleCount += strlen(mac_str);
                 ble_notification[BleCount++] = '"';
                 ble_notification[BleCount++] = ',';
-                //memcpy(&ble_notification[BleCount], "\"name\":\"Infrared\"", strlen("\"name\":\"Infrared\""));
-                memcpy(&ble_notification[BleCount], "\"name\"", strlen("\"name\""));
-                BleCount += strlen("\"name\"");
-                ble_notification[BleCount++] = ':';
-                ble_notification[BleCount++] = 0x22;
-                ble_notification[BleCount++] = 'I';
-                ble_notification[BleCount++] = 'R';
-                ble_notification[BleCount++] = 0x22;
-                // ble_notification[BleCount++] = ',';
-                // memcpy(&ble_notification[BleCount], "\"InfraRed\"", strlen("\"InfraRed\""));
-                // BleCount += strlen("\"InfraRed\"");
+                memcpy(&ble_notification[BleCount], BLE_NAME, strlen(BLE_NAME));
+                BleCount += strlen(BLE_NAME); 
                 ble_notification[BleCount++] = ',';
-                memcpy(&ble_notification[BleCount], "\"type\":\"ir\"", strlen("\"type\":\"ir\""));
-                BleCount += strlen("\"type\":\"ir\"");       
+                memcpy(&ble_notification[BleCount], BLE_TYPE, strlen(BLE_TYPE));
+                BleCount += strlen(BLE_TYPE);       
 
                 ble_notification[BleCount++] = '}';
-                
+
                 // if(ble_connect_status){
                 send_ble_message((char *)ble_notification);
                 vTaskDelay(pdMS_TO_TICKS(100)); // Add a small delay after sending
@@ -399,17 +357,16 @@ void setting_mode_task(void *pvParameters) {
 
             apps_ble_stop();
 
-            // vTaskResume(LedTaskHandle); // Resume LED WiFi task
+            // vTaskResume(led_wifi_task_handle); // Resume LED WiFi task
             setting_mode_flag = true;
             // NamiSwitch.SaveWifiFlag = NAMI_SAVE;
             NamiFlash();
-            NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, 1);
+            NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, 1);
             NamiSwitch.ModeCalibFlag = false;
             return;
         }
         attempt--;
     }
-
     LOGA(WF, "Exiting setting mode...\r\n");
 }
 
@@ -420,20 +377,20 @@ void key1_irq_neg(void *arg)
 {
     key0_press_start = xTaskGetTickCount();
     NamiSwitch.TimerStartFlag = true;
-    LOGA(WF, "detect start press button \r\n");
     NAMI_GPIO_IRQ_SET(&isr_key1, HOSAL_IRQ_TRIG_POS_PULSE, key1_irq_pos, NULL);
+
 }
 void key1_irq_pos(void *arg)
 {
     static TickType_t last_press_time = 0;
-    LOGA(WF, "detect stop button \r\n");
+
     press_duration = (xTaskGetTickCount() - key0_press_start) * portTICK_PERIOD_MS;
     NamiSwitch.TimerStopFlag = true;
     if (press_duration < 2000) { // Short press
-        NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, 0);
+        NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, 0);
         gpio_status_relay4 = 1; // Toggle relay state
-        // bl_gpio_output_set(GPIO_RELAY_OUT4, gpio_status_relay4); // Control the relay output
         last_press_time = xTaskGetTickCount(); // Update last press time
+
     }
     NAMI_GPIO_IRQ_SET(&isr_key1, HOSAL_IRQ_TRIG_NEG_PULSE, key1_irq_neg, NULL);
     // Send event to queue (use ISR-safe version)
@@ -461,7 +418,6 @@ void relay_event_task(void *pvParameters)
     NamiSwitch.SwitchStatusBroker = &NamiMQTT.StatusBroker;
     NamiSwitch.SwMacStr           = &NamiMQTT.mac_str;
     NamiSwitch.StateOld           = 0;
-    NamiSwitch.ModeCalibFlag      = false;
     //NamiSwitch.StateCurrent       = 10;
 
 
@@ -471,25 +427,24 @@ void relay_event_task(void *pvParameters)
             NamiSwitch.SetCount++;
             LOGA(WF, "event.duration=%d/ count=%d\r\n", event.duration, NamiSwitch.SetCount);
 
-            if(event.duration >= 15000){
+            if(event.duration >= 12000){
                 NamiSwitch.Duration = event.duration;
                 event.duration = 0;
                 NamiSwitch.ChangeCalibFlag = false;
                 ERR(WF, "Err: NOISE - Duration=%d/ count=%d\r\n", NamiSwitch.Duration, NamiSwitch.SetCount);
                 submit_gpio_relay_status_to_mqtt_server(NOISE_BUTTON);
-            }else if(event.duration >= 7000){
-                submit_gpio_relay_status_to_mqtt_server(RESET_BUTTON);
+            }else if(event.duration >= 9000){
                 LOGA(WF, "Reset Firmware after 3s...\r\n");
                 vTaskDelay(pdMS_TO_TICKS(3000));
-                NAMI_SYSTEM_RESET();
+                NAMI_PRE_SYSTEM_RESET();	
             }else if(event.duration >= 3000){
-                if(NamiSwitch.BreakOutCalibrateFlag){
+                 if(NamiSwitch.BreakOutCalibrateFlag){
                     NamiSwitch.SetCount = 0;
                     NamiSwitch.ChangeCalibFlag = false;
-                    NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, 1);
+                    NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, 1);
                     NamiSwitch.BreakOutCalibrateFlag = false;
                 }else if(*NamiSwitch.SwitchStatusBroker != NAMI_CONNECTED || NamiSwitch.SetCount != 0){
-                    NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, 0);
+                    NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, 0);
                     NamiSwitch.SetCount = 0;
                     NamiSwitch.ExitCalibrateFlag = true;
                     NamiSwitch.ChangeCalibFlag = false;
@@ -499,10 +454,10 @@ void relay_event_task(void *pvParameters)
                 }else{
                     NamiSwitch.SetCount = 0;
                     NamiSwitch.ChangeCalibFlag = false;
-                    NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, 1);
+                    NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, 1);
                 }
             }else{
-                NAMI_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, 1);
+                NAMI_PRE_GPIO_OUTPUT_SET(GPIO_LED_NOTIFY, 1);
             }
         }
     }

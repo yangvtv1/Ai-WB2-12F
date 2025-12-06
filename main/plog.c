@@ -395,8 +395,9 @@ void PLOG_Run(void)
 void PLOG_Init(void)
 {
 	 memset(&PLOG, 0x00, sizeof(PLOG));
-	 PLOG.Init = &PLOG_Init;
+	 PLOG.Init        = &PLOG_Init;
 	 PLOG.plog_parser = &_plog_parser;
+	 PLOG.Stop        = &PLOG_Stop;
 //	/*USART0*/	
 //	PLOG.usart.peri.uart.rcu_uart = USART0;
 //	PLOG.usart.peri.uart.tx.port = GPIOA;

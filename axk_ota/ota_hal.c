@@ -7,7 +7,6 @@
 
 #include <hal_boot2.h>
 #include <bl_mtd.h>
-#include "plog.h"
 // #include <hal_sys.h>
 
 static uint8_t activeID;
@@ -19,9 +18,6 @@ static uint32_t part_size;
 static uint32_t fw_size;
 static uint32_t last_offset;
 
-
-uint32_t ValGetSize;
-
 static int init_ota_partition(void)
 {
     int ret;
@@ -29,22 +25,22 @@ static int init_ota_partition(void)
     if (ota_init_state == 0) {
         ret = bl_mtd_open(BL_MTD_PARTITION_NAME_FW_DEFAULT, &otaHandle, BL_MTD_OPEN_FLAG_BACKUP);
         if (ret) {
-            ERR(OTA, "Open Default FW partition failed\r\n");
+            printf("Open Default FW partition failed\r\n");
             return -1;
         }
 
         activeID = hal_boot2_get_active_partition();
-        LOGA(OTA, "[OTA] activeID:%d \r\n", activeID);
+        printf("[OTA] activeID:%d \r\n", activeID);
 
         if (hal_boot2_get_active_entries(BOOT2_PARTITION_TYPE_FW, &otaEntry)) {
-            LOGA(OTA, "PtTable_Get_Active_Entries fail\r\n");
+            printf("PtTable_Get_Active_Entries fail\r\n");
             return -1;
         }
         ota_addr = otaEntry.Address[!otaEntry.activeIndex];
         part_size = otaEntry.maxLen[!otaEntry.activeIndex];
         hal_update_mfg_ptable();
         // bl_mtd_erase_all(otaHandle);
-        LOGA(OTA, "init_ota_partition success, ota_addr:0x%x, part_size:0x%x \r\n",(unsigned int) ota_addr, (unsigned int)part_size);
+        printf("init_ota_partition success, ota_addr:0x%x, part_size:0x%x \r\n",(unsigned int) ota_addr, (unsigned int)part_size);
 
         ota_init_state = 1;
     }
@@ -93,12 +89,11 @@ int partition_write_ota_farmware(int dst_offset, const void *src, int size)
 
     if (dst_offset - last_offset > 0x4000) {
         last_offset = dst_offset;
-        LOGA(OTA, "[OTA] write dst_offset:0x%0x \r\n", (unsigned int)last_offset);
+        printf("[OTA] write dst_offset:0x%0x \r\n", (unsigned int)last_offset);
     }
 
     bl_mtd_write(otaHandle, dst_offset, size, src);
     fw_size = dst_offset + size;
-    ValGetSize = fw_size;
 
     return 0;
 }
@@ -116,11 +111,11 @@ int partition_erase(int start_addr, int size)
         return -1;
     }
     if (start_addr + size > part_size) {
-        LOGA(OTA, "[OTA] erase out of area, part_size:0x%0x \r\n", (unsigned int)part_size);
+        printf("[OTA] erase out of area, part_size:0x%0x \r\n", (unsigned int)part_size);
         return -1;
     }
 
-    LOGA(OTA, "[OTA] erase start_addr:0x%0x size:0x%0x \r\n", start_addr, size);
+    printf("[OTA] erase start_addr:0x%0x size:0x%0x \r\n", start_addr, size);
     bl_mtd_erase(otaHandle, start_addr, size);
 
     return 0;
@@ -135,7 +130,7 @@ void set_boot_partition(void)
     uint8_t buff[256];
 
     otaEntry.len = fw_size;
-    LOGA(OTA, "[OTA] ota size:0x%0x \r\n", (unsigned int)fw_size);
+    printf("[OTA] ota size:0x%0x \r\n", (unsigned int)fw_size);
     hal_boot2_update_ptable(&otaEntry);
 }
 
@@ -146,9 +141,6 @@ void set_boot_partition(void)
 ********************************/
 void set_reboot(_Bool ota_result)
 {
-    // xTaskCreate(PreSetReboot, "PreSetReboot", 128, NULL, 13, NULL);
     vTaskDelay(1000);
     bl_sys_reset_por();
 }
-
-
